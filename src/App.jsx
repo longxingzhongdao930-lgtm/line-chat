@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, ChevronLeft, Plus, Users, Image as ImageIcon } from "lucide-react";
+import { Send, ChevronLeft, Plus, Users, Image as ImageIcon, Settings, Volume2, VolumeX, EyeOff, Eye, Trash2 } from "lucide-react";
 
 const SUPABASE_URL = "https://lmoyxwkrbzsuwdgbwyit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_UJGqCLzEH9Z9jsBWafWmqw__PFeudUT";
@@ -20,6 +20,23 @@ async function api(path, opts = {}) {
 }
 
 const REACTIONS = ["❤️", "😂", "😮", "😢", "👍"];
+
+function playNotifySound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (e) {
+    // 無視
+  }
+}
 
 function Avatar({ name, size = 32 }) {
   const colors = ["#06C755", "#00B900", "#FF9500", "#5B8DEF", "#F45B69", "#9B59B6"];
@@ -55,7 +72,7 @@ function NicknameGate({ onSet }) {
         onChange={(e) => setVal(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && val.trim() && onSet(val.trim())}
         placeholder="例: たろう"
-        style={{ width: "80%", padding: "12px 14px", borderRadius: 10, border: "1px solid #ddd", fontSize: 15, outline: "none" }}
+        style={{ width: "80%", padding: "12px 14px", borderRadius: 10, border: "1px solid #ddd", fontSize: 16, outline: "none" }}
       />
       <button
         onClick={() => val.trim() && onSet(val.trim())}
@@ -67,10 +84,79 @@ function NicknameGate({ onSet }) {
   );
 }
 
-function RoomList({ nickname, onOpen }) {
+function SettingsPanel({ nickname, settings, onChangeSettings, onDeleteAccount, onClose }) {
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", width: "100%", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: "20px 18px 28px" }}
+      >
+        <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: "#111" }}>設定</div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #f0f0f0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {settings.notification_sound ? <Volume2 size={19} color="#333" /> : <VolumeX size={19} color="#999" />}
+            <span style={{ fontSize: 15, color: "#111" }}>通知音</span>
+          </div>
+          <div
+            onClick={() => onChangeSettings({ ...settings, notification_sound: !settings.notification_sound })}
+            style={{ width: 44, height: 26, borderRadius: 13, background: settings.notification_sound ? "#06C755" : "#ddd", position: "relative", cursor: "pointer" }}
+          >
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: settings.notification_sound ? 20 : 2, transition: "left 0.15s" }} />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #f0f0f0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {settings.hide_read ? <EyeOff size={19} color="#999" /> : <Eye size={19} color="#333" />}
+            <div>
+              <div style={{ fontSize: 15, color: "#111" }}>既読をつけない</div>
+              <div style={{ fontSize: 11, color: "#999" }}>相手に既読が表示されなくなります</div>
+            </div>
+          </div>
+          <div
+            onClick={() => onChangeSettings({ ...settings, hide_read: !settings.hide_read })}
+            style={{ width: 44, height: 26, borderRadius: 13, background: settings.hide_read ? "#06C755" : "#ddd", position: "relative", cursor: "pointer", flexShrink: 0 }}
+          >
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: settings.hide_read ? 20 : 2, transition: "left 0.15s" }} />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 20 }}>
+          {!confirming ? (
+            <button
+              onClick={() => setConfirming(true)}
+              style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #F45B69", background: "#fff", color: "#F45B69", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+            >
+              <Trash2 size={16} /> アカウントを削除
+            </button>
+          ) : (
+            <div style={{ background: "#fff5f5", borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 13, color: "#c33", marginBottom: 10 }}>
+                本当に削除しますか?トーク履歴・メッセージが全て消え、元に戻せません。
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setConfirming(false)} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", fontSize: 13 }}>
+                  キャンセル
+                </button>
+                <button onClick={onDeleteAccount} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "#F45B69", color: "#fff", fontSize: 13, fontWeight: 600 }}>
+                  削除する
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+function RoomList({ nickname, settings, onChangeSettings, onDeleteAccount, onOpen }) {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [isGroup, setIsGroup] = useState(false);
   const [partner, setPartner] = useState("");
   const [groupName, setGroupName] = useState("");
@@ -145,8 +231,13 @@ function RoomList({ nickname, onOpen }) {
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#fff" }}>
       <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: "#111" }}>トーク</div>
-        <div onClick={() => setShowNew(true)} style={{ cursor: "pointer" }}>
-          <Plus size={22} color="#06C755" />
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <div onClick={() => setShowSettings(true)} style={{ cursor: "pointer" }}>
+            <Settings size={20} color="#666" />
+          </div>
+          <div onClick={() => setShowNew(true)} style={{ cursor: "pointer" }}>
+            <Plus size={22} color="#06C755" />
+          </div>
         </div>
       </div>
 
@@ -172,7 +263,7 @@ function RoomList({ nickname, onOpen }) {
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               placeholder="グループ名(省略可)"
-              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14 }}
+              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 16 }}
             />
           )}
 
@@ -181,7 +272,7 @@ function RoomList({ nickname, onOpen }) {
               value={partner}
               onChange={(e) => setPartner(e.target.value)}
               placeholder={isGroup ? "相手をカンマ区切りで(例: たろう, はなこ)" : "相手のニックネーム"}
-              style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14 }}
+              style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 16 }}
               onKeyDown={(e) => e.key === "Enter" && createRoom()}
             />
             <button onClick={createRoom} style={{ background: "#06C755", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 14 }}>
@@ -216,17 +307,27 @@ function RoomList({ nickname, onOpen }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 15, color: "#111" }}>{displayName}</div>
                 <div style={{ fontSize: 13, color: "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {r.lastMsg ? `${r.is_group ? r.lastMsg.nickname + ": " : ""}${r.lastMsg.content}` : "メッセージはまだありません"}
+                  {r.lastMsg ? (r.lastMsg.image_url ? `${r.is_group ? r.lastMsg.nickname + ": " : ""}📷 画像` : `${r.is_group ? r.lastMsg.nickname + ": " : ""}${r.lastMsg.content}`) : "メッセージはまだありません"}
                 </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {showSettings && (
+        <SettingsPanel
+          nickname={nickname}
+          settings={settings}
+          onChangeSettings={onChangeSettings}
+          onDeleteAccount={onDeleteAccount}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }
-function ChatRoom({ room, nickname, members, onBack }) {
+function ChatRoom({ room, nickname, members, settings, onBack }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [reads, setReads] = useState({});
@@ -234,11 +335,21 @@ function ChatRoom({ room, nickname, members, onBack }) {
   const [pickerFor, setPickerFor] = useState(null);
   const bottomRef = useRef(null);
   const seenIds = useRef(new Set());
+  const firstLoad = useRef(true);
   const otherMembers = members.filter((m) => m !== nickname);
   const headerName = room.is_group ? room.name : otherMembers[0] || "?";
 
   const loadAll = async () => {
     const msgs = await api(`messages?room_id=eq.${room.id}&select=*&order=created_at.asc&limit=200`);
+
+    if (!firstLoad.current) {
+      const newOnes = msgs.filter((m) => !seenIds.current.has(m.id) && m.nickname !== nickname);
+      if (newOnes.length > 0 && settings.notification_sound) {
+        playNotifySound();
+      }
+    }
+    firstLoad.current = false;
+
     msgs.forEach((m) => seenIds.current.add(m.id));
     setMessages(msgs);
 
@@ -260,9 +371,11 @@ function ChatRoom({ room, nickname, members, onBack }) {
       });
       setReactions(reactMap);
 
-      const unread = msgs.filter((m) => m.nickname !== nickname && !(readMap[m.id] || []).includes(nickname));
-      for (const m of unread) {
-        api("message_reads", { method: "POST", body: JSON.stringify({ message_id: m.id, nickname }) }).catch(() => {});
+      if (!settings.hide_read) {
+        const unread = msgs.filter((m) => m.nickname !== nickname && !(readMap[m.id] || []).includes(nickname));
+        for (const m of unread) {
+          api("message_reads", { method: "POST", body: JSON.stringify({ message_id: m.id, nickname }) }).catch(() => {});
+        }
       }
     }
   };
@@ -271,7 +384,7 @@ function ChatRoom({ room, nickname, members, onBack }) {
     loadAll();
     const interval = setInterval(loadAll, 1500);
     return () => clearInterval(interval);
-  }, [room.id]);
+  }, [room.id, settings.hide_read, settings.notification_sound]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -371,7 +484,7 @@ function ChatRoom({ room, nickname, members, onBack }) {
                     maxWidth: "62%",
                     background: isMe ? "#06C755" : "#fff",
                     color: isMe ? "#fff" : "#111",
-                    padding: "8px 12px",
+                    padding: m.image_url ? 4 : "8px 12px",
                     borderRadius: 16,
                     borderBottomRightRadius: isMe ? 4 : 16,
                     borderBottomLeftRadius: !isMe ? 4 : 16,
@@ -432,7 +545,7 @@ function ChatRoom({ room, nickname, members, onBack }) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
             placeholder="メッセージを入力"
-            style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14 }}
+            style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 16 }}
           />
         </div>
         <div onClick={send} style={{ width: 34, height: 34, borderRadius: "50%", background: input.trim() ? "#06C755" : "#ccc", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>
@@ -442,21 +555,75 @@ function ChatRoom({ room, nickname, members, onBack }) {
     </div>
   );
 }
+const DEFAULT_SETTINGS = { notification_sound: true, hide_read: false };
 
 export default function App() {
   const [nickname, setNickname] = useState(null);
   const [activeRoom, setActiveRoom] = useState(null);
   const [members, setMembers] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    if (!nickname) return;
+    api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`)
+      .then((rows) => {
+        if (rows[0]) {
+          setSettings({ notification_sound: rows[0].notification_sound, hide_read: !!rows[0].hide_read });
+        } else {
+          api("user_settings", { method: "POST", body: JSON.stringify({ nickname, notification_sound: true }) }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, [nickname]);
+
+  const changeSettings = async (newSettings) => {
+    setSettings(newSettings);
+    try {
+      await api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ notification_sound: newSettings.notification_sound, hide_read: newSettings.hide_read }),
+      });
+    } catch (e) {
+      api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ notification_sound: newSettings.notification_sound }),
+      }).catch(() => {});
+    }
+  };
+
+  const deleteAccount = async () => {
+    try {
+      const myMsgs = await api(`messages?nickname=eq.${encodeURIComponent(nickname)}&select=id`);
+      const msgIds = myMsgs.map((m) => m.id);
+      if (msgIds.length > 0) {
+        await api(`message_reactions?message_id=in.(${msgIds.join(",")})`, { method: "DELETE" });
+        await api(`message_reads?message_id=in.(${msgIds.join(",")})`, { method: "DELETE" });
+      }
+      await api(`message_reads?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+      await api(`message_reactions?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+      await api(`messages?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+      await api(`room_members?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+      await api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+    } catch (e) {
+      console.error(e);
+    }
+    setNickname(null);
+    setActiveRoom(null);
+    setSettings(DEFAULT_SETTINGS);
+  };
 
   if (!nickname) return <NicknameGate onSet={setNickname} />;
 
   if (activeRoom) {
-    return <ChatRoom room={activeRoom} nickname={nickname} members={members} onBack={() => setActiveRoom(null)} />;
+    return <ChatRoom room={activeRoom} nickname={nickname} members={members} settings={settings} onBack={() => setActiveRoom(null)} />;
   }
 
   return (
     <RoomList
       nickname={nickname}
+      settings={settings}
+      onChangeSettings={changeSettings}
+      onDeleteAccount={deleteAccount}
       onOpen={(room, mem) => {
         setActiveRoom(room);
         setMembers(mem);
