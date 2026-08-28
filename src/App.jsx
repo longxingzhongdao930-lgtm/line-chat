@@ -63,26 +63,85 @@ function Avatar({ name, size = 32 }) {
 }
 
 function NicknameGate({ onSet }) {
-  const [val, setVal] = useState("");
+  const [nick, setNick] = useState("");
+  const [pw, setPw] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!nick.trim() || !pw.trim()) {
+      setError("ニックネームとパスワードを入力してください");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const existing = await api(`user_settings?nickname=eq.${encodeURIComponent(nick.trim())}&select=password_hash`);
+      if (existing.length > 0 && existing[0].password_hash) {
+        // 既存ユーザー → ログイン照合
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_login`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ p_nickname: nick.trim(), p_password: pw }),
+        });
+        const ok = await res.json();
+        if (ok === true) {
+          onSet(nick.trim());
+        } else {
+          setError("パスワードが違います");
+        }
+      } else {
+        // 新規登録
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/register_user`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ p_nickname: nick.trim(), p_password: pw }),
+        });
+        const ok = await res.json();
+        if (ok === true) {
+          onSet(nick.trim());
+        } else {
+          setError("登録に失敗しました");
+        }
+      }
+    } catch (e) {
+      setError("エラーが発生しました");
+    }
+    setLoading(false);
+  };
+
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "#f5f5f5", padding: 24 }}>
-      <div style={{ fontSize: 20, fontWeight: 700, color: "#111" }}>ニックネームを入力</div>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#f5f5f5", padding: 24 }}>
+      <div style={{ fontSize: 20, fontWeight: 700, color: "#111" }}>ログイン / 新規登録</div>
       <input
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && val.trim() && onSet(val.trim())}
-        placeholder="例: たろう"
+        value={nick}
+        onChange={(e) => setNick(e.target.value)}
+        placeholder="ニックネーム"
         style={{ width: "80%", padding: "12px 14px", borderRadius: 10, border: "1px solid #ddd", fontSize: 16, outline: "none" }}
       />
+      <input
+        type="password"
+        value={pw}
+        onChange={(e) => setPw(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && submit()}
+        placeholder="パスワード"
+        style={{ width: "80%", padding: "12px 14px", borderRadius: 10, border: "1px solid #ddd", fontSize: 16, outline: "none" }}
+      />
+      {error && <div style={{ color: "#F45B69", fontSize: 13 }}>{error}</div>}
       <button
-        onClick={() => val.trim() && onSet(val.trim())}
+        onClick={submit}
+        disabled={loading}
         style={{ background: "#06C755", color: "#fff", border: "none", padding: "10px 28px", borderRadius: 20, fontSize: 15, fontWeight: 600, cursor: "pointer" }}
       >
-        はじめる
+        {loading ? "確認中..." : "はじめる"}
       </button>
+      <div style={{ fontSize: 11, color: "#999", textAlign: "center", maxWidth: 260 }}>
+        初めてのニックネームは自動で新規登録されます。同じニックネームでログインする場合はパスワードが必要です。
+      </div>
     </div>
   );
 }
+
 const ADMIN_PASSWORD = "Nachi1102";
 
 function AdminPanel() {
