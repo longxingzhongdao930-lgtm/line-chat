@@ -83,6 +83,100 @@ function NicknameGate({ onSet }) {
     </div>
   );
 }
+const ADMIN_PASSWORD = "Nachi1102";
+
+function AdminPanel() {
+  const [authed, setAuthed] = useState(false);
+  const [pw, setPw] = useState("");
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadUsers = async () => {
+    setLoading(true);
+    const settingsRows = await api("user_settings?select=nickname");
+    const memberRows = await api("room_members?select=nickname");
+    const allNames = Array.from(new Set([...settingsRows.map((r) => r.nickname), ...memberRows.map((r) => r.nickname)]));
+
+    const withCounts = await Promise.all(
+      allNames.map(async (n) => {
+        const rooms = await api(`room_members?nickname=eq.${encodeURIComponent(n)}&select=room_id`);
+        const msgs = await api(`messages?nickname=eq.${encodeURIComponent(n)}&select=id`);
+        return { nickname: n, roomCount: rooms.length, msgCount: msgs.length };
+      })
+    );
+    setUsers(withCounts);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (authed) loadUsers();
+  }, [authed]);
+
+  const deleteUser = async (nickname) => {
+    if (!confirm(`「${nickname}」を完全に削除しますか?`)) return;
+    try {
+      const myMsgs = await api(`messages?nickname=eq.${encodeURIComponent(nickname)}&select=id`);
+      const msgIds = myMsgs.map((m) => m.id);
+      if (msgIds.length > 0) {
+        await api(`message_reactions?message_id=in.(${msgIds.join(",")})`, { method: "DELETE" });
+        await api(`message_reads?message_id=in.(${msgIds.join(",")})`, { method: "DELETE" });
+      }
+      await api(`message_reads?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+      await api(`message_reactions?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+      await api(`messages?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+      await api(`room_members?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+      await api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+      loadUsers();
+    } catch (e) {
+      alert("削除に失敗しました");
+    }
+  };
+
+  if (!authed) {
+    return (
+      <div style={{ height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#111", padding: 24 }}>
+        <div style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>管理画面ログイン</div>
+        <input
+          type="password"
+          value={pw}
+          onChange={(e) => setPw(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && pw === ADMIN_PASSWORD && setAuthed(true)}
+          placeholder="パスワード"
+          style={{ width: "80%", padding: "12px 14px", borderRadius: 10, border: "1px solid #444", fontSize: 16, background: "#222", color: "#fff", outline: "none" }}
+        />
+        <button
+          onClick={() => (pw === ADMIN_PASSWORD ? setAuthed(true) : alert("パスワードが違います"))}
+          style={{ background: "#06C755", color: "#fff", border: "none", padding: "10px 28px", borderRadius: 20, fontSize: 15, fontWeight: 600 }}
+        >
+          ログイン
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f5f5f5", padding: 16 }}>
+      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, color: "#111" }}>アカウント管理</div>
+      <div style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>全 {users.length} アカウント</div>
+      {loading && <div style={{ color: "#999", fontSize: 13 }}>読み込み中...</div>}
+      {users.map((u) => (
+        <div key={u.nickname} style={{ background: "#fff", borderRadius: 10, padding: 14, marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 15, color: "#111" }}>{u.nickname}</div>
+            <div style={{ fontSize: 12, color: "#888" }}>参加ルーム {u.roomCount} ・ 送信メッセージ {u.msgCount}</div>
+          </div>
+          <button
+            onClick={() => deleteUser(u.nickname)}
+            style={{ background: "#fff", border: "1px solid #F45B69", color: "#F45B69", borderRadius: 8, padding: "6px 12px", fontSize: 13 }}
+          >
+            削除
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 function SettingsPanel({ nickname, settings, onChangeSettings, onDeleteAccount, onClose }) {
   const [confirming, setConfirming] = useState(false);
@@ -611,6 +705,9 @@ export default function App() {
     setActiveRoom(null);
     setSettings(DEFAULT_SETTINGS);
   };
+  const isAdmin = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("admin") === "1";
+  if (isAdmin) return <AdminPanel />;
+
 
   if (!nickname) return <NicknameGate onSet={setNickname} />;
 
