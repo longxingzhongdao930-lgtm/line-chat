@@ -277,7 +277,7 @@ function SettingsPanel({ nickname, settings, onChangeSettings, onDeleteAccount, 
           </div>
         </div>
 
-        <div style={{ marginTop: 20 }}>
+                <div style={{ marginTop: 20 }}>
           {!confirming ? (
             <button
               onClick={() => setConfirming(true)}
@@ -301,6 +301,7 @@ function SettingsPanel({ nickname, settings, onChangeSettings, onDeleteAccount, 
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
