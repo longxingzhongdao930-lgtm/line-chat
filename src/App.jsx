@@ -690,3 +690,58 @@ function ChatRoom({ room, nickname, members, settings, onBack }) {
     </div>
   );
 }
+const DEFAULT_SETTINGS = { notification_sound: true, hide_read: false };
+
+export default function App() {
+  const isAdmin = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("admin") === "1";
+  if (isAdmin) return <AdminPanel />;
+
+  const [nickname, setNickname] = useState(null);
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    if (!nickname) return;
+    api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`)
+      .then((rows) => {
+        if (rows[0]) {
+          setSettings({ notification_sound: rows[0].notification_sound, hide_read: !!rows[0].hide_read });
+        }
+      })
+      .catch(() => {});
+  }, [nickname]);
+
+  const changeSettings = async (newSettings) => {
+    setSettings(newSettings);
+    try {
+      await api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ notification_sound: newSettings.notification_sound, hide_read: newSettings.hide_read }),
+      });
+    } catch (e) {
+      api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ notification_sound: newSettings.notification_sound }),
+      }).catch(() => {});
+    }
+  };
+
+  if (!nickname) return <NicknameGate onSet={setNickname} />;
+
+  if (activeRoom) {
+    return <ChatRoom room={activeRoom} nickname={nickname} members={members} settings={settings} onBack={() => setActiveRoom(null)} />;
+  }
+
+  return (
+    <RoomList
+      nickname={nickname}
+      settings={settings}
+      onChangeSettings={changeSettings}
+      onOpen={(room, mem) => {
+        setActiveRoom(room);
+        setMembers(mem);
+      }}
+    />
+  );
+}
