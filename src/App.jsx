@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, ChevronLeft, Plus, Users, Image as ImageIcon, Settings, Volume2, VolumeX, EyeOff, Eye, Trash2 } from "lucide-react";
+import { Send, ChevronLeft, Plus, Users, Image as ImageIcon, Settings, Volume2, VolumeX, EyeOff, Eye } from "lucide-react";
 
 const SUPABASE_URL = "https://lmoyxwkrbzsuwdgbwyit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_UJGqCLzEH9Z9jsBWafWmqw__PFeudUT";
@@ -33,9 +33,7 @@ function playNotifySound() {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
     osc.start();
     osc.stop(ctx.currentTime + 0.3);
-  } catch (e) {
-    // 無視
-  }
+  } catch (e) {}
 }
 
 function Avatar({ name, size = 32 }) {
@@ -78,7 +76,6 @@ function NicknameGate({ onSet }) {
     try {
       const existing = await api(`user_settings?nickname=eq.${encodeURIComponent(nick.trim())}&select=password_hash`);
       if (existing.length > 0 && existing[0].password_hash) {
-        // 既存ユーザー → ログイン照合
         const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_login`, {
           method: "POST",
           headers,
@@ -91,7 +88,6 @@ function NicknameGate({ onSet }) {
           setError("パスワードが違います");
         }
       } else {
-        // 新規登録
         const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/register_user`, {
           method: "POST",
           headers,
@@ -137,6 +133,48 @@ function NicknameGate({ onSet }) {
       </button>
       <div style={{ fontSize: 11, color: "#999", textAlign: "center", maxWidth: 260 }}>
         初めてのニックネームは自動で新規登録されます。同じニックネームでログインする場合はパスワードが必要です。
+      </div>
+    </div>
+  );
+}
+
+function SettingsPanel({ settings, onChangeSettings, onClose }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", width: "100%", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: "20px 18px 28px" }}
+      >
+        <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: "#111" }}>設定</div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #f0f0f0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {settings.notification_sound ? <Volume2 size={19} color="#333" /> : <VolumeX size={19} color="#999" />}
+            <span style={{ fontSize: 15, color: "#111" }}>通知音</span>
+          </div>
+          <div
+            onClick={() => onChangeSettings({ ...settings, notification_sound: !settings.notification_sound })}
+            style={{ width: 44, height: 26, borderRadius: 13, background: settings.notification_sound ? "#06C755" : "#ddd", position: "relative", cursor: "pointer" }}
+          >
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: settings.notification_sound ? 20 : 2, transition: "left 0.15s" }} />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {settings.hide_read ? <EyeOff size={19} color="#999" /> : <Eye size={19} color="#333" />}
+            <div>
+              <div style={{ fontSize: 15, color: "#111" }}>既読をつけない</div>
+              <div style={{ fontSize: 11, color: "#999" }}>相手に既読が表示されなくなります</div>
+            </div>
+          </div>
+          <div
+            onClick={() => onChangeSettings({ ...settings, hide_read: !settings.hide_read })}
+            style={{ width: 44, height: 26, borderRadius: 13, background: settings.hide_read ? "#06C755" : "#ddd", position: "relative", cursor: "pointer", flexShrink: 0 }}
+          >
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: settings.hide_read ? 20 : 2, transition: "left 0.15s" }} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -235,78 +273,7 @@ function AdminPanel() {
     </div>
   );
 }
-
-
-function SettingsPanel({ nickname, settings, onChangeSettings, onDeleteAccount, onClose }) {
-  const [confirming, setConfirming] = useState(false);
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "flex-end" }} onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", width: "100%", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: "20px 18px 28px" }}
-      >
-        <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: "#111" }}>設定</div>
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #f0f0f0" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {settings.notification_sound ? <Volume2 size={19} color="#333" /> : <VolumeX size={19} color="#999" />}
-            <span style={{ fontSize: 15, color: "#111" }}>通知音</span>
-          </div>
-          <div
-            onClick={() => onChangeSettings({ ...settings, notification_sound: !settings.notification_sound })}
-            style={{ width: 44, height: 26, borderRadius: 13, background: settings.notification_sound ? "#06C755" : "#ddd", position: "relative", cursor: "pointer" }}
-          >
-            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: settings.notification_sound ? 20 : 2, transition: "left 0.15s" }} />
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #f0f0f0" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {settings.hide_read ? <EyeOff size={19} color="#999" /> : <Eye size={19} color="#333" />}
-            <div>
-              <div style={{ fontSize: 15, color: "#111" }}>既読をつけない</div>
-              <div style={{ fontSize: 11, color: "#999" }}>相手に既読が表示されなくなります</div>
-            </div>
-          </div>
-          <div
-            onClick={() => onChangeSettings({ ...settings, hide_read: !settings.hide_read })}
-            style={{ width: 44, height: 26, borderRadius: 13, background: settings.hide_read ? "#06C755" : "#ddd", position: "relative", cursor: "pointer", flexShrink: 0 }}
-          >
-            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: settings.hide_read ? 20 : 2, transition: "left 0.15s" }} />
-          </div>
-        </div>
-
-                <div style={{ marginTop: 20 }}>
-          {!confirming ? (
-            <button
-              onClick={() => setConfirming(true)}
-              style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #F45B69", background: "#fff", color: "#F45B69", fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-            >
-              <Trash2 size={16} /> アカウントを削除
-            </button>
-          ) : (
-            <div style={{ background: "#fff5f5", borderRadius: 10, padding: 14 }}>
-              <div style={{ fontSize: 13, color: "#c33", marginBottom: 10 }}>
-                本当に削除しますか?トーク履歴・メッセージが全て消え、元に戻せません。
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setConfirming(false)} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", fontSize: 13 }}>
-                  キャンセル
-                </button>
-                <button onClick={onDeleteAccount} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "#F45B69", color: "#fff", fontSize: 13, fontWeight: 600 }}>
-                  削除する
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-      </div>
-    </div>
-  );
-}
-function RoomList({ nickname, settings, onChangeSettings, onDeleteAccount, onOpen }) {
+function RoomList({ nickname, settings, onChangeSettings, onOpen }) {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -470,13 +437,7 @@ function RoomList({ nickname, settings, onChangeSettings, onDeleteAccount, onOpe
       </div>
 
       {showSettings && (
-        <SettingsPanel
-          nickname={nickname}
-          settings={settings}
-          onChangeSettings={onChangeSettings}
-          onDeleteAccount={onDeleteAccount}
-          onClose={() => setShowSettings(false)}
-        />
+        <SettingsPanel settings={settings} onChangeSettings={onChangeSettings} onClose={() => setShowSettings(false)} />
       )}
     </div>
   );
@@ -593,11 +554,23 @@ function ChatRoom({ room, nickname, members, settings, onBack }) {
     loadAll();
   };
 
+  const deleteMessage = async (messageId) => {
+    if (!confirm("このメッセージを削除しますか?")) return;
+    try {
+      await api(`message_reactions?message_id=eq.${messageId}`, { method: "DELETE" });
+      await api(`message_reads?message_id=eq.${messageId}`, { method: "DELETE" });
+      await api(`messages?id=eq.${messageId}`, { method: "DELETE" });
+      setMessages((m) => m.filter((msg) => msg.id !== messageId));
+      setPickerFor(null);
+    } catch (e) {
+      alert("削除に失敗しました");
+    }
+  };
+
   const readCountFor = (messageId) => {
     const readers = (reads[messageId] || []).filter((n) => n !== nickname && otherMembers.includes(n));
     return readers.length;
   };
-
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#9DC8B9" }}>
       <div style={{ background: "#fff", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #eee" }}>
@@ -658,12 +631,20 @@ function ChatRoom({ room, nickname, members, settings, onBack }) {
               </div>
 
               {pickerFor === m.id && (
-                <div style={{ display: "flex", gap: 4, background: "#fff", borderRadius: 20, padding: "4px 8px", marginTop: 4, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
+                <div style={{ display: "flex", gap: 4, alignItems: "center", background: "#fff", borderRadius: 20, padding: "4px 8px", marginTop: 4, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
                   {REACTIONS.map((e) => (
                     <span key={e} onClick={() => toggleReaction(m.id, e)} style={{ fontSize: 18, cursor: "pointer", padding: 2 }}>
                       {e}
                     </span>
                   ))}
+                  {isMe && (
+                    <span
+                      onClick={() => deleteMessage(m.id)}
+                      style={{ fontSize: 12, color: "#F45B69", cursor: "pointer", marginLeft: 4, borderLeft: "1px solid #eee", paddingLeft: 8 }}
+                    >
+                      削除
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -707,84 +688,5 @@ function ChatRoom({ room, nickname, members, settings, onBack }) {
         </div>
       </div>
     </div>
-  );
-}
-const DEFAULT_SETTINGS = { notification_sound: true, hide_read: false };
-
-export default function App() {
-  const [nickname, setNickname] = useState(null);
-  const [activeRoom, setActiveRoom] = useState(null);
-  const [members, setMembers] = useState([]);
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-
-  useEffect(() => {
-    if (!nickname) return;
-    api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`)
-      .then((rows) => {
-        if (rows[0]) {
-          setSettings({ notification_sound: rows[0].notification_sound, hide_read: !!rows[0].hide_read });
-        } else {
-          api("user_settings", { method: "POST", body: JSON.stringify({ nickname, notification_sound: true }) }).catch(() => {});
-        }
-      })
-      .catch(() => {});
-  }, [nickname]);
-
-  const changeSettings = async (newSettings) => {
-    setSettings(newSettings);
-    try {
-      await api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ notification_sound: newSettings.notification_sound, hide_read: newSettings.hide_read }),
-      });
-    } catch (e) {
-      api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ notification_sound: newSettings.notification_sound }),
-      }).catch(() => {});
-    }
-  };
-
-  const deleteAccount = async () => {
-    try {
-      const myMsgs = await api(`messages?nickname=eq.${encodeURIComponent(nickname)}&select=id`);
-      const msgIds = myMsgs.map((m) => m.id);
-      if (msgIds.length > 0) {
-        await api(`message_reactions?message_id=in.(${msgIds.join(",")})`, { method: "DELETE" });
-        await api(`message_reads?message_id=in.(${msgIds.join(",")})`, { method: "DELETE" });
-      }
-      await api(`message_reads?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
-      await api(`message_reactions?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
-      await api(`messages?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
-      await api(`room_members?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
-      await api(`user_settings?nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
-    } catch (e) {
-      console.error(e);
-    }
-    setNickname(null);
-    setActiveRoom(null);
-    setSettings(DEFAULT_SETTINGS);
-  };
-  const isAdmin = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("admin") === "1";
-  if (isAdmin) return <AdminPanel />;
-
-
-  if (!nickname) return <NicknameGate onSet={setNickname} />;
-
-  if (activeRoom) {
-    return <ChatRoom room={activeRoom} nickname={nickname} members={members} settings={settings} onBack={() => setActiveRoom(null)} />;
-  }
-
-  return (
-    <RoomList
-      nickname={nickname}
-      settings={settings}
-      onChangeSettings={changeSettings}
-      onDeleteAccount={deleteAccount}
-      onOpen={(room, mem) => {
-        setActiveRoom(room);
-        setMembers(mem);
-      }}
-    />
   );
 }
