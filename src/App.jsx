@@ -282,4 +282,147 @@ function ChatRoom({ room, nickname, members, onBack }) {
     if (!input.trim()) return;
     const text = input;
     setInput("");
-    const saved = await api("messages", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ n
+    const saved = await api("messages", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ nickname, content: text, room_id: room.id }) });
+    if (saved && saved[0]) {
+      seenIds.current.add(saved[0].id);
+      setMessages((m) => [...m, saved[0]]);
+    }
+  };
+
+  const toggleReaction = async (messageId, emoji) => {
+    const existing = (reactions[messageId] || []).find((r) => r.nickname === nickname);
+    if (existing && existing.emoji === emoji) {
+      await api(`message_reactions?message_id=eq.${messageId}&nickname=eq.${encodeURIComponent(nickname)}`, { method: "DELETE" });
+    } else {
+      await api("message_reactions", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify({ message_id: messageId, nickname, emoji }),
+      });
+    }
+    setPickerFor(null);
+    loadAll();
+  };
+
+  const readCountFor = (messageId) => {
+    const readers = (reads[messageId] || []).filter((n) => n !== nickname && otherMembers.includes(n));
+    return readers.length;
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#9DC8B9" }}>
+      <div style={{ background: "#fff", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #eee" }}>
+        <ChevronLeft size={24} color="#333" style={{ cursor: "pointer" }} onClick={onBack} />
+        {room.is_group ? (
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: "#5B8DEF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Users size={16} color="#fff" />
+          </div>
+        ) : (
+          <Avatar name={headerName} size={34} />
+        )}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, color: "#111" }}>{headerName}</div>
+          {room.is_group && <div style={{ fontSize: 11, color: "#999" }}>{members.join("、")}</div>}
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "14px 10px", display: "flex", flexDirection: "column", gap: 14 }}>
+        {messages.map((m) => {
+          const isMe = m.nickname === nickname;
+          const readCount = isMe ? readCountFor(m.id) : 0;
+          const msgReactions = reactions[m.id] || [];
+          return (
+            <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start" }}>
+              {room.is_group && !isMe && (
+                <div style={{ fontSize: 11, color: "#e8f5e9", marginBottom: 2, marginLeft: 36 }}>{m.nickname}</div>
+              )}
+              <div style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 6, width: "100%" }}>
+                {isMe && readCount > 0 && (
+                  <span style={{ fontSize: 10, color: "#5b8def" }}>
+                    {room.is_group ? `既読${readCount}` : "既読"}
+                  </span>
+                )}
+                {!isMe && <Avatar name={m.nickname} size={28} />}
+                <div
+                  onClick={() => setPickerFor(pickerFor === m.id ? null : m.id)}
+                  style={{
+                    maxWidth: "62%",
+                    background: isMe ? "#06C755" : "#fff",
+                    color: isMe ? "#fff" : "#111",
+                    padding: "8px 12px",
+                    borderRadius: 16,
+                    borderBottomRightRadius: isMe ? 4 : 16,
+                    borderBottomLeftRadius: !isMe ? 4 : 16,
+                    fontSize: 14.5,
+                    lineHeight: 1.4,
+                    boxShadow: "0 1px 1px rgba(0,0,0,0.08)",
+                    cursor: "pointer",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {m.content}
+                </div>
+              </div>
+
+              {pickerFor === m.id && (
+                <div style={{ display: "flex", gap: 4, background: "#fff", borderRadius: 20, padding: "4px 8px", marginTop: 4, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
+                  {REACTIONS.map((e) => (
+                    <span key={e} onClick={() => toggleReaction(m.id, e)} style={{ fontSize: 18, cursor: "pointer", padding: 2 }}>
+                      {e}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {msgReactions.length > 0 && (
+                <div style={{ display: "flex", gap: 2, marginTop: 2, background: "#fff", borderRadius: 10, padding: "2px 6px", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
+                  {msgReactions.map((r, i) => (
+                    <span key={i} style={{ fontSize: 12 }}>{r.emoji}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      <div style={{ background: "#fff", padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ flex: 1, background: "#f0f0f0", borderRadius: 18, padding: "8px 12px", display: "flex", alignItems: "center" }}>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            placeholder="メッセージを入力"
+            style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14 }}
+          />
+        </div>
+        <div onClick={send} style={{ width: 34, height: 34, borderRadius: "50%", background: input.trim() ? "#06C755" : "#ccc", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>
+          <Send size={15} color="#fff" style={{ marginLeft: -1 }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [nickname, setNickname] = useState(null);
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [members, setMembers] = useState([]);
+
+  if (!nickname) return <NicknameGate onSet={setNickname} />;
+
+  if (activeRoom) {
+    return <ChatRoom room={activeRoom} nickname={nickname} members={members} onBack={() => setActiveRoom(null)} />;
+  }
+
+  return (
+    <RoomList
+      nickname={nickname}
+      onOpen={(room, mem) => {
+        setActiveRoom(room);
+        setMembers(mem);
+      }}
+    />
+  );
+}
