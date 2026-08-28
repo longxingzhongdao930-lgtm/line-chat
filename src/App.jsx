@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, ChevronLeft, Plus, Users } from "lucide-react";
+import { Send, ChevronLeft, Plus, Users, Image as ImageIcon } from "lucide-react";
 
 const SUPABASE_URL = "https://lmoyxwkrbzsuwdgbwyit.supabase.co";
 const SUPABASE_KEY = "sb_publishable_UJGqCLzEH9Z9jsBWafWmqw__PFeudUT";
@@ -226,7 +226,6 @@ function RoomList({ nickname, onOpen }) {
     </div>
   );
 }
-
 function ChatRoom({ room, nickname, members, onBack }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -277,6 +276,29 @@ function ChatRoom({ room, nickname, members, onBack }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const sendImage = async (file) => {
+    const fileName = `${Date.now()}_${file.name}`;
+    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/chat-images/${fileName}`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      body: file,
+    });
+    if (!uploadRes.ok) {
+      alert("画像のアップロードに失敗しました");
+      return;
+    }
+    const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/chat-images/${fileName}`;
+    const saved = await api("messages", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ nickname, content: "", image_url: imageUrl, room_id: room.id }),
+    });
+    if (saved && saved[0]) {
+      seenIds.current.add(saved[0].id);
+      setMessages((m) => [...m, saved[0]]);
+    }
+  };
 
   const send = async () => {
     if (!input.trim()) return;
@@ -360,7 +382,11 @@ function ChatRoom({ room, nickname, members, onBack }) {
                     wordBreak: "break-word",
                   }}
                 >
-                  {m.content}
+                  {m.image_url ? (
+                    <img src={m.image_url} alt="" style={{ maxWidth: "100%", borderRadius: 12, display: "block" }} />
+                  ) : (
+                    m.content
+                  )}
                 </div>
               </div>
 
@@ -388,6 +414,18 @@ function ChatRoom({ room, nickname, members, onBack }) {
       </div>
 
       <div style={{ background: "#fff", padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+        <label style={{ cursor: "pointer", flexShrink: 0 }}>
+          <ImageIcon size={22} color="#666" />
+          <input
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              if (e.target.files[0]) sendImage(e.target.files[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
         <div style={{ flex: 1, background: "#f0f0f0", borderRadius: 18, padding: "8px 12px", display: "flex", alignItems: "center" }}>
           <input
             value={input}
